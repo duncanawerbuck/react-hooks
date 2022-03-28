@@ -4,22 +4,14 @@
 import * as React from 'react';
 
 function Greeting({initialName = ''}) {
-  // 🐨 initialize the state to the value from localStorage
-  const nameFromLocalStorage =
-    window.localStorage.getItem('name') ?? initialName;
-  const [name, setName] = React.useState(
-    () => initialName || nameFromLocalStorage
-  );
-
-  // 🐨 Here's where you'll use `React.useEffect`.
-  // The callback should set the `name` in localStorage.
-  React.useEffect(() => {
-    window.localStorage.setItem('name', name, [name]);
-  });
+  // Here we're using a custom hook that hides and encapsulates the use of localStorage. The custom
+  // hook is implemented at the end of this file.
+  const [name, setName] = useLocalStorageState(initialName);
 
   function handleChange(event) {
     setName(event.target.value);
   }
+
   return (
     <div>
       <form>
@@ -36,3 +28,19 @@ function App() {
 }
 
 export default App;
+
+/**
+ * A custom hook that encapsulates the use of localStorage for reading and setting the name value,
+ * allowing the name value that a user enters to be preserved across page refreshes.
+ */
+function useLocalStorageState(initialName) {
+  const [name, setName] = React.useState(
+    () => window.localStorage.getItem('name') || initialName || ''
+  );
+
+  React.useEffect(() => {
+    window.localStorage.setItem('name', name);
+  }, [name]);
+
+  return [name, setName];
+}
