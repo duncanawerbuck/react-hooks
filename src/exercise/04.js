@@ -3,16 +3,52 @@
 
 import * as React from 'react';
 
-function Board() {
-  const [squares, setSquares] = React.useState(Array(9).fill(null));
+function Game() {
+  const [squares, setSquares] = useLocalStorageState(
+    'currentStep',
+    Array(9).fill(null)
+  );
 
-  // 🐨 We'll need the following bits of derived state:
-  // - nextValue ('X' or 'O')
-  // - winner ('X', 'O', or null)
-  // - status (`Winner: ${winner}`, `Scratch: Cat's game`, or `Next player: ${nextValue}`)
-  // 💰 I've written the calculations for you! So you can use my utilities
-  // below to create these variables
+  const [history, setHistory] = useLocalStorageState('history', []);
 
+  const appendStepToHistory = newStep => {
+    setHistory([...history, newStep]);
+  }
+
+  function restart() {
+    setHistory([]);
+    setSquares(Array(9).fill(null));
+  }
+
+  function getStatus() {
+    const nextValue = calculateNextValue(squares);
+    const winner = calculateWinner(squares);
+    const gameStatus = calculateStatus(winner, squares, nextValue);
+    return {gameStatus, nextValue};
+  }
+
+  return (
+    <div className="game">
+      <div className="game-board">
+        <Board
+          squares={squares}
+          setSquares={setSquares}
+          getStatus={getStatus}
+          appendStepToHistory={appendStepToHistory}
+        />
+        <button className="restart" onClick={restart}>
+          restart
+        </button>
+        <div className="game-info">
+          <div>{getStatus().gameStatus}</div>
+          {/* <ol>{moves}</ol> */}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Board({squares, setSquares, getStatus, appendStepToHistory}) {
   function selectSquare(square) {
     // bail if game already over
     const {gameStatus, nextValue} = getStatus();
@@ -25,11 +61,7 @@ function Board() {
 
     updatedSquares[square] = nextValue;
     setSquares(updatedSquares);
-  }
-
-  function restart() {
-    // 🐨 reset the squares
-    setSquares(Array(9).fill(null));
+    appendStepToHistory(updatedSquares);
   }
 
   function renderSquare(i) {
@@ -40,16 +72,8 @@ function Board() {
     );
   }
 
-  function getStatus() {
-    const nextValue = calculateNextValue(squares);
-    const winner = calculateWinner(squares);
-    const gameStatus = calculateStatus(winner, squares, nextValue);
-    return {gameStatus, nextValue};
-  }
-
   return (
     <div>
-      <div className="status">{getStatus().gameStatus}</div>
       <div className="board-row">
         {renderSquare(0)}
         {renderSquare(1)}
@@ -64,19 +88,6 @@ function Board() {
         {renderSquare(6)}
         {renderSquare(7)}
         {renderSquare(8)}
-      </div>
-      <button className="restart" onClick={restart}>
-        restart
-      </button>
-    </div>
-  );
-}
-
-function Game() {
-  return (
-    <div className="game">
-      <div className="game-board">
-        <Board />
       </div>
     </div>
   );
