@@ -3,28 +3,73 @@
 
 import * as React from 'react';
 
+const SQUARE_COUNT = 9;
+
 function Game() {
   const [squares, setSquares] = useLocalStorageState(
     'currentStep',
-    Array(9).fill(null)
+    Array(SQUARE_COUNT).fill(null)
   );
 
   const [history, setHistory] = useLocalStorageState('history', []);
 
-  const appendStepToHistory = newStep => {
-    setHistory([...history, newStep]);
+  const nextValue = calculateNextValue(squares);
+  const winner = calculateWinner(squares);
+  const gameStatus = calculateStatus(winner, squares, nextValue);
+
+  const recordNewMove = updatedSquares => {
+    // if this isn't the latest move played (i.e. user has selected a historic move and is playing
+    // over it), we must purge the move they're playing over, as well as all subsequent moves as
+    // they are now orphaned
+    const newMoveIsAnOverwrite = isNewMoveAnOverwrite(updatedSquares);
+    if (newMoveIsAnOverwrite)
+      setHistory(calculateNewRewrittenHistory(updatedSquares));
+    else setHistory([...history, updatedSquares]);
+
+    setSquares(updatedSquares);
+  };
+
+  function calculateNewRewrittenHistory(updatedSquares) {
+    // to delete orphaned moves, we need to know how many of the original historic moves to keep
+    const numberOfMovesInNewRewrittenHistory = updatedSquares.filter(
+      s => s !== null
+    ).length;
+
+    // we subtract 1 here because we will be adding the new move in a moment
+    const newHistoricItemCount = numberOfMovesInNewRewrittenHistory - 1;
+
+    let latestRewrittenHistory = [];
+
+    // some historic items are to be kept as they haven't been overwritten by the latest move
+    for (let ix = 0; ix < newHistoricItemCount; ix++) {
+      latestRewrittenHistory.push(history[ix]);
+    }
+
+    // append the latest move
+    latestRewrittenHistory.push(updatedSquares);
+
+    return latestRewrittenHistory;
   }
 
-  function restart() {
+  function isNewMoveAnOverwrite() {
+    const noMovesPlayed = history.filter(s => s !== null).length === 0;
+    if (noMovesPlayed) return false;
+
+    return (
+      history.filter(s => s !== null).length >
+      squares.filter(s => s !== null).length
+    );
+  }
+
+  function handleRestartClick() {
     setHistory([]);
-    setSquares(Array(9).fill(null));
+    setSquares(Array(SQUARE_COUNT).fill(null));
   }
 
-  function getStatus() {
-    const nextValue = calculateNextValue(squares);
-    const winner = calculateWinner(squares);
-    const gameStatus = calculateStatus(winner, squares, nextValue);
-    return {gameStatus, nextValue};
+  function showMove(ix) {
+    if (ix < 0) return;
+    const selectedMove = history[ix];
+    setSquares(selectedMove);
   }
 
   return (
@@ -32,26 +77,44 @@ function Game() {
       <div className="game-board">
         <Board
           squares={squares}
-          setSquares={setSquares}
-          getStatus={getStatus}
-          appendStepToHistory={appendStepToHistory}
+          recordNewMove={recordNewMove}
+          nextValue={nextValue}
+          gameStatus={gameStatus}
         />
-        <button className="restart" onClick={restart}>
+        <button className="restart" onClick={handleRestartClick}>
           restart
         </button>
         <div className="game-info">
-          <div>{getStatus().gameStatus}</div>
-          {/* <ol>{moves}</ol> */}
+          <div>{gameStatus}</div>
+          <GameStateButtons history={history} showMove={showMove} />
         </div>
       </div>
     </div>
   );
 }
 
-function Board({squares, setSquares, getStatus, appendStepToHistory}) {
+function GameStateButtons({history, showMove}) {
+  return (
+    <ul>
+      <li>
+        <button type="button" onClick={() => showMove(history.length - 1)}>
+          Show current move
+        </button>
+      </li>
+      {history.map((move, ix) => (
+        <li key={ix}>
+          <button type="button" onClick={() => showMove(ix)}>{`Show move ${
+            ix + 1
+          }`}</button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Board({squares, recordNewMove, gameStatus, nextValue}) {
   function selectSquare(square) {
     // bail if game already over
-    const {gameStatus, nextValue} = getStatus();
     if (!gameStatus.startsWith('Next player:')) return;
 
     // bail if square already taken
@@ -60,8 +123,7 @@ function Board({squares, setSquares, getStatus, appendStepToHistory}) {
     const updatedSquares = [...squares];
 
     updatedSquares[square] = nextValue;
-    setSquares(updatedSquares);
-    appendStepToHistory(updatedSquares);
+    recordNewMove(updatedSquares);
   }
 
   function renderSquare(i) {
